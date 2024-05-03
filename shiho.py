@@ -751,6 +751,65 @@ async def cards(ctx, event):
     os.remove("eventcard.png")
 
 
+@bot.command(name="assets")
+async def assets(ctx, event: str):
+    async with ctx.typing():
+        with ZipFile(event + "_assets.zip", 'w') as zip_file:
+            # logo
+            events_url = 'https://sekai-world.github.io/sekai-master-db-tc-diff/events.json'
+            events = urllib.request.urlopen(events_url)
+            events_json = json.loads(events.read())
+            for e in events_json:
+                if e["id"] == int(event):
+                    assetBundleName = e["assetbundleName"]
+                    break
+            logo_url = "https://storage.sekai.best/sekai-tc-assets/event/" + assetBundleName + "/logo_rip/logo.webp"
+            logo_req = requests.get(logo_url)
+            logo_im = Image.open(BytesIO(logo_req.content))
+            file_object = io.BytesIO()
+            logo_im.save(file_object, "PNG")
+            logo_im.close()
+            zip_file.writestr("logo.png", file_object.getvalue())
+
+            # cards
+            eventcards_url = "https://sekai-world.github.io/sekai-master-db-tc-diff/eventCards.json"
+            eventcards = urllib.request.urlopen(eventcards_url)
+            eventcards_json = json.loads(eventcards.read())
+            card_ids = []
+            flag = "n"
+            for c in eventcards_json:
+                if c["eventId"] == int(event):
+                    card_ids.append(c["cardId"])
+                    flag = "y"
+                elif flag == "y":
+                    break
+
+            all_cards = urllib.request.urlopen("https://sekai-world.github.io/sekai-master-db-tc-diff/cards.json")
+            cards_json = json.loads(all_cards.read())
+            for c in cards_json:
+                if card_ids:
+                    if c["id"] in card_ids:
+                        if c["cardRarityType"] != "rarity_2":
+                            name = c["assetbundleName"]
+                            card_url = "https://storage.sekai.best/sekai-assets/character/member/" + name + "_rip/card_normal.webp"
+                            card_req = requests.get(card_url)
+                            im = Image.open(BytesIO(card_req.content))
+                            file_object = io.BytesIO()
+                            im.save(file_object, "PNG")
+                            im.close()
+                            zip_file.writestr(f"card{c['id']}.png", file_object.getvalue())
+                            card_url = "https://storage.sekai.best/sekai-assets/character/member/" + name + "_rip/card_after_training.webp"
+                            card_req = requests.get(card_url)
+                            im = Image.open(BytesIO(card_req.content))
+                            file_object = io.BytesIO()
+                            im.save(file_object, "PNG")
+                            im.close()
+                            zip_file.writestr(f"card{c['id']}_trained.png", file_object.getvalue())
+                        card_ids.remove(c["id"])
+        await ctx.send(file=discord.File(event + "_assets.zip"))
+    os.remove(event + "_assets.zip")
+
+
 @bot.command(name="add_role", hidden=True)
 async def add_role(ctx, uid: int, name, colour, image: int):
     if 1006476907367370824 not in [r.id for r in ctx.author.roles]:
@@ -901,6 +960,7 @@ async def commands(ctx):
                                       "\n\n**&gacha [number=1]**\n模擬游戲内抽卡\nnumber=10會保底一張3星"
                                       "\n\n**&logo <event>**\n發出指定活動的徽標"
                                       "\n\n**&cards <event>**\n發出指定活動的3、4星卡片(特訓前後)"
+                                      "\n\n**&assets <event>**\n發出存有指定活動的徽標和3、4星卡的zip file"
                                       "\n\n**&get_badges <event> <start_id> <end_id>**\n自動根據活動分數命名然後下載該活動的所有成績圖"
                                       "\n注意: 此指令必須要local run才能使用，有需要用請告訴SK，否則無法使用"
                                       "\nstart_id: 第一張要下載的成績圖前一個信息的id"
@@ -915,7 +975,7 @@ async def commands(ctx):
                                       "\nname, colour, im_message_id: 同上"
                                       "\n\n**&shiho**\n顯示此指令介紹，指令表會定期更新\n** **",
                           colour=0xadf252)
-    embed.set_footer(text="最後更新: 18/8/2023")
+    embed.set_footer(text="最後更新: 3/5/2024")
     await ctx.send(embed=embed)
 
 
