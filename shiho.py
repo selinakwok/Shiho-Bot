@@ -30,7 +30,7 @@ bot = commands.Bot(command_prefix='&', intents=intents)
 async def on_ready():
     print(f'We have logged in as {bot.user}')
 
-url = 'https://sekai-world.github.io/sekai-master-db-tc-diff/cards.json'
+url = 'https://sekai-world.github.io/sekai-master-db-diff/cards.json'
 response = urllib.request.urlopen(url)
 data = json.loads(response.read())
 
@@ -632,30 +632,42 @@ async def on_message(message):
         image = np.asarray(bytearray(resp.read()), dtype="uint8")
         image = cv2.imdecode(image, cv2.IMREAD_COLOR)
 
-        original_image = image
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        org_image = image
+        # img_blur = cv2.GaussianBlur(org_image, (5, 5), 0, 0)
+        gray = cv2.cvtColor(org_image, cv2.COLOR_BGR2GRAY)
         edges = cv2.Canny(gray, 50, 200)
+        """result = org_image.copy()
+        result[edges != 0] = (0, 255, 0)
+        cv2.imshow("result", result)
+        cv2.waitKey(0)"""
         contours, hierarchy = cv2.findContours(edges.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         sorted_contours = sorted(contours, key=cv2.contourArea, reverse=True)
-        sorted_contours = [sorted_contours[0]]
+        bbox = sorted_contours[0]
+        x, y, w, h = cv2.boundingRect(bbox)
+        # print(f"x={x}, y={y}, w={w}, h={h}")
+        edge_w = math.floor(h * 0.048)
+        cropped_contour = org_image[y-edge_w: y+h+edge_w, x-edge_w: x+w+edge_w]
+        image_name = "result.png"
+        cv2.imwrite(image_name, cropped_contour)
 
+        """sorted_contours = [sorted_contours[0]]
         for (i, c) in enumerate(sorted_contours):
             x, y, w, h = cv2.boundingRect(c)
-
-            cropped_contour = original_image[y:y + h, x:x + w]
+            print(f"x={x}, y={y}, w={w}, h={h}")
+            cropped_contour = org_image[y-5:y+h+5, x-5:x+w+5]
             image_name = "result.png"
-            cv2.imwrite(image_name, cropped_contour)
+            cv2.imwrite(image_name, cropped_contour)"""
 
         cv2.destroyAllWindows()
 
         im_transparent = Image.open("result.png")
-        im_transparent = im_transparent.resize((944, 107))
+        im_transparent = im_transparent.resize((1148, 114))
         im_transparent.convert("RGBA")
 
-        mask = Image.new("L", (944, 107), 0)
+        mask = Image.new("L", (1148, 114), 0)
         draw = ImageDraw.Draw(mask)
-        draw.rounded_rectangle((0, 0, 944, 107), radius=20, fill=255)
-        alpha = Image.new("L", (944, 107), 255)
+        draw.rounded_rectangle((0, 0, 1148, 114), radius=20, fill=255)
+        alpha = Image.new("L", (1148, 114), 255)
         alpha.paste(mask)
 
         im_transparent.putalpha(alpha)
@@ -737,12 +749,12 @@ async def cards(ctx, event):
             if c["id"] in card_ids:
                 if c["cardRarityType"] != "rarity_2":
                     name = c["assetbundleName"]
-                    card_url = "https://storage.sekai.best/sekai-assets/character/member/" + name + "_rip/card_normal.webp"
+                    card_url = "https://storage.sekai.best/sekai-tc-assets/character/member/" + name + "_rip/card_normal.webp"
                     card_req = requests.get(card_url)
                     im = Image.open(BytesIO(card_req.content))
                     im.save("eventcard.png", "png")
                     await ctx.send(file=discord.File("eventcard.png"))
-                    card_url = "https://storage.sekai.best/sekai-assets/character/member/" + name + "_rip/card_after_training.webp"
+                    card_url = "https://storage.sekai.best/sekai-tc-assets/character/member/" + name + "_rip/card_after_training.webp"
                     card_req = requests.get(card_url)
                     im = Image.open(BytesIO(card_req.content))
                     im.save("eventcard.png", "png")
@@ -791,14 +803,14 @@ async def assets(ctx, event: str):
                     if c["id"] in card_ids:
                         if c["cardRarityType"] != "rarity_2":
                             name = c["assetbundleName"]
-                            card_url = "https://storage.sekai.best/sekai-assets/character/member/" + name + "_rip/card_normal.webp"
+                            card_url = "https://storage.sekai.best/sekai-tc-assets/character/member/" + name + "_rip/card_normal.webp"
                             card_req = requests.get(card_url)
                             im = Image.open(BytesIO(card_req.content))
                             file_object = io.BytesIO()
                             im.save(file_object, "PNG")
                             im.close()
                             zip_file.writestr(f"card{c['id']}.png", file_object.getvalue())
-                            card_url = "https://storage.sekai.best/sekai-assets/character/member/" + name + "_rip/card_after_training.webp"
+                            card_url = "https://storage.sekai.best/sekai-tc-assets/character/member/" + name + "_rip/card_after_training.webp"
                             card_req = requests.get(card_url)
                             im = Image.open(BytesIO(card_req.content))
                             file_object = io.BytesIO()
