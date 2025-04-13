@@ -188,6 +188,35 @@ async def check_event_change():  # check every day at 04:00
                            "- Event end: " + bot.next_end.strftime("%m/%d %H:%M"))
 
 
+@tasks.loop(time=datetime.time(18, 0, 0, tzinfo=hktz), reconnect=True)
+async def auto_send_logo():  # check every day at 19:00
+    # send current event logo before event ends
+    now = datetime.datetime.now(hktz)
+    if bot.end_day - datetime.timedelta(hours=5) < now < bot.end_day:  # 結活日 15/16:00 < now (19:00) < 20/21:00 (end)
+        events_url = 'https://sekai-world.github.io/sekai-master-db-tc-diff/events.json'
+        events = urllib.request.urlopen(events_url)
+        events_json = json.loads(events.read())
+        for e in events_json:
+            if e["id"] == int(bot.event_no):
+                assetBundleName = e["assetbundleName"]
+                break
+        try:
+            logo_url = "https://storage.sekai.best/sekai-tc-assets/event/" + assetBundleName + "/logo_rip/logo.webp"
+            logo_req = requests.get(logo_url)
+            im = Image.open(BytesIO(logo_req.content))
+        except PIL.UnidentifiedImageError:
+            logo_url = "https://storage.sekai.best/sekai-tc-assets/event/" + assetBundleName + "/logo/logo.webp"
+            logo_req = requests.get(logo_url)
+            im = Image.open(BytesIO(logo_req.content))
+        im.save(f"{bot.event_no}_logo.png", "png")
+
+        channel = bot.get_channel(1009155014356377700)
+        thread = channel.get_thread(1029205688817307669)
+        await thread.send(f"----- Event {bot.event_no} -----")
+        await thread.send(file=discord.File(f"{bot.event_no}_logo.png"))
+        os.remove(f"{bot.event_no}_logo.png")
+
+
 @bot.event
 async def on_ready():
     channel = bot.get_channel(1007203228515057687)
