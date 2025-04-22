@@ -189,10 +189,12 @@ async def check_event_change():  # check every day at 04:00
 
 
 @tasks.loop(time=datetime.time(18, 0, 0, tzinfo=hktz), reconnect=True)
-async def auto_send_logo():  # check every day at 19:00
+async def auto_send_logo():  # check every day at 18:00
     # send current event logo before event ends
     now = datetime.datetime.now(hktz)
-    if bot.end_day - datetime.timedelta(hours=5) < now < bot.end_day:  # 結活日 15/16:00 < now (19:00) < 20/21:00 (end)
+    bot_test = bot.get_channel(1007203228515057687)
+    await bot_test.send("Check auto send time")
+    if bot.end_day - datetime.timedelta(hours=5) < now < bot.end_day:  # 結活日 15/16:00 < now (18:00) < 20/21:00 (end)
         events_url = 'https://sekai-world.github.io/sekai-master-db-tc-diff/events.json'
         events = urllib.request.urlopen(events_url)
         events_json = json.loads(events.read())
@@ -244,6 +246,8 @@ async def on_ready():
 
     check_event_change.start()
     await channel.send("check_event_change started")
+    auto_send_logo.start()
+    await channel.send("auto_check_logo started")
 
 
 @bot.event
