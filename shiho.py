@@ -192,8 +192,7 @@ async def check_event_change():  # check every day at 04:00
 async def auto_send_logo():  # check every day at 18:00
     # send current event logo before event ends
     now = datetime.datetime.now(hktz)
-    bot_test = bot.get_channel(1007203228515057687)
-    await bot_test.send("Check auto send time")
+    # bot_test = bot.get_channel(1007203228515057687)
     if bot.end_day - datetime.timedelta(hours=5) < now < bot.end_day:  # 結活日 15/16:00 < now (18:00) < 20/21:00 (end)
         events_url = 'https://sekai-world.github.io/sekai-master-db-tc-diff/events.json'
         events = urllib.request.urlopen(events_url)
@@ -464,10 +463,19 @@ async def on_raw_reaction_add(payload):
             message = await bot.get_partial_messageable(payload.channel_id).fetch_message(payload.message_id)
             await message.remove_reaction(payload.emoji, payload.member)
 
-    elif payload.message_id == 1043345445637857321: # add 退車通知 role
+    elif payload.message_id == 1043345445637857321:  # add 退車通知 role
         police = bot.get_emoji(1006480156258476042)
         if payload.emoji == police:
             role = discord.utils.get(bot.get_guild(guild_id).roles, id=1043345953589055498)
+            await payload.member.add_roles(role)
+        else:
+            message = await bot.get_partial_messageable(payload.channel_id).fetch_message(payload.message_id)
+            await message.remove_reaction(payload.emoji, payload.member)
+
+    elif payload.message_id == 1377556589749342270:  # add 歌回通知 role
+        rin_cheer = bot.get_emoji(1006933775025963029)
+        if payload.emoji == rin_cheer:
+            role = discord.utils.get(bot.get_guild(guild_id).roles, id=1377554010034143262)
             await payload.member.add_roles(role)
         else:
             message = await bot.get_partial_messageable(payload.channel_id).fetch_message(payload.message_id)
@@ -686,10 +694,19 @@ async def on_raw_reaction_remove(payload):
             message = await bot.get_partial_messageable(payload.channel_id).fetch_message(payload.message_id)
             await message.remove_reaction(payload.emoji, payload.member)
 
-    elif payload.message_id == 1043345445637857321: # remove 退車通知
+    elif payload.message_id == 1043345445637857321:  # remove 退車通知
         police = bot.get_emoji(1006480156258476042)
         if payload.emoji == police:
             role = discord.utils.get(bot.get_guild(guild_id).roles, id=1043345953589055498)
+            await member.remove_roles(role)
+        else:
+            message = await bot.get_partial_messageable(payload.channel_id).fetch_message(payload.message_id)
+            await message.remove_reaction(payload.emoji, payload.member)
+
+    elif payload.message_id == 1377556589749342270:  # remove 歌回通知 role
+        rin_cheer = bot.get_emoji(1006933775025963029)
+        if payload.emoji == rin_cheer:
+            role = discord.utils.get(bot.get_guild(guild_id).roles, id=1377554010034143262)
             await member.remove_roles(role)
         else:
             message = await bot.get_partial_messageable(payload.channel_id).fetch_message(payload.message_id)
@@ -1409,7 +1426,6 @@ async def send(ctx):
     bot.reminder_message_id = reminder_message.id
     for i in range(2):
         await reminder_message.add_reaction(reminder_emojis[i])
-    """
 
     reminder_emojis = ["<:25_knd_police:1006480156258476042>"]
     reminder_message = await ctx.send(
@@ -1418,6 +1434,17 @@ async def send(ctx):
     bot.reminder_message_id = reminder_message.id
     for i in range(1):
         await reminder_message.add_reaction(reminder_emojis[i])
+
+
+    reminder_emojis = ["<:vs_rin_cheer:1006933775025963029>"]
+    reminder_message = await ctx.send(
+        "按反應領取`歌回通知`身分組：\n"
+        "<:vs_rin_cheer:1006933775025963029> 有偶像唱歌時可@你")
+    bot.reminder_message_id = reminder_message.id
+    for i in range(1):
+        await reminder_message.add_reaction(reminder_emojis[i])
+
+    """
 
 
 @bot.command(name='logo',
