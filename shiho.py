@@ -22,6 +22,7 @@ import math
 from zipfile import ZipFile
 import cv2
 import numpy as np
+import time
 
 from cards import card
 
@@ -1446,164 +1447,178 @@ async def send(ctx):
 
     """
 
+# ========== Assets ==========
+
+
+async def fetch_image(session, url):
+    try:
+        async with session.get(url, timeout=20) as response:
+            response.raise_for_status()
+            return await response.read()
+    except Exception:
+        if "_rip" in url:
+            fallback_url = url.replace("_rip", "")
+            try:
+                async with session.get(fallback_url, timeout=20) as response:
+                    response.raise_for_status()
+                    return await response.read()
+            except Exception:
+                return None
+        return None
+
 
 @bot.command(name='logo',
              brief='發出活動徽標',
              help='發出指定活動的徽標')
 async def logo(ctx, event):
-    events_url = 'https://sekai-world.github.io/sekai-master-db-tc-diff/events.json'
-    events = urllib.request.urlopen(events_url)
-    events_json = json.loads(events.read())
-    for e in events_json:
-        if e["id"] == int(event):
-            assetBundleName = e["assetbundleName"]
-            break
+    async with aiohttp.ClientSession() as session:
+        events_url = 'https://sekai-world.github.io/sekai-master-db-tc-diff/events.json'
+        async with session.get(events_url) as response:
+                events_json = await response.json()
+        
+        assetBundleName = None
+        for e in events_json:
+            if e["id"] == int(event):
+                assetBundleName = e["assetbundleName"]
+                break
 
-    try:
-        logo_url = "https://storage.sekai.best/sekai-tc-assets/event/" + assetBundleName + "/logo_rip/logo.webp"
-        logo_req = requests.get(logo_url)
-        im = Image.open(BytesIO(logo_req.content))
-    except PIL.UnidentifiedImageError:
-        logo_url = "https://storage.sekai.best/sekai-tc-assets/event/" + assetBundleName + "/logo/logo.webp"
-        logo_req = requests.get(logo_url)
-        im = Image.open(BytesIO(logo_req.content))
-    im.save("logo.png", "png")
-
-    await ctx.send(file=discord.File("logo.png"))
-    os.remove("logo.png")
+        logo_url = f"https://storage.sekai.best/sekai-tc-assets/event/{assetBundleName}/logo_rip/logo.webp"
+        try:
+            async with session.get(logo_url) as response:
+                response.raise_for_status()
+                image_data = await response.read()
+        except aiohttp.ClientResponseError:
+            # Fallback without _rip
+            logo_url = f"https://storage.sekai.best/sekai-tc-assets/event/{assetBundleName}/logo/logo.webp"
+            async with session.get(logo_url) as response:
+                image_data = await response.read()
+        
+        with open("logo.png", "wb") as f:
+            f.write(image_data)
+        
+        await ctx.send(file=discord.File("logo.png"))
+        os.remove("logo.png")
 
 
 @bot.command(name="cards")
 async def cards(ctx, event):
-    eventcards_url = "https://sekai-world.github.io/sekai-master-db-tc-diff/eventCards.json"
-    eventcards = urllib.request.urlopen(eventcards_url)
-    eventcards_json = json.loads(eventcards.read())
-    card_ids = []
-    flag = "n"
-    for c in eventcards_json:
-        if c["eventId"] == int(event):
-            card_ids.append(c["cardId"])
-            flag = "y"
-        elif flag == "y":
-            break
+    
+    async with aiohttp.ClientSession() as session:
+        eventcards_url = "https://sekai-world.github.io/sekai-master-db-tc-diff/eventCards.json"
+        async with session.get(eventcards_url) as response:
+                    eventcards_json = await response.json()
+        
+        card_ids = []
+        flag = "n"
+        for c in eventcards_json:
+            if c["eventId"] == int(event):
+                card_ids.append(c["cardId"])
+                flag = "y"
+            elif flag == "y":
+                break
 
-    all_cards = urllib.request.urlopen("https://sekai-world.github.io/sekai-master-db-tc-diff/cards.json")
-    cards_json = json.loads(all_cards.read())
-    for c in cards_json:
-        if card_ids:
-            if c["id"] in card_ids:
-                if c["cardRarityType"] != "rarity_2":
-                    name = c["assetbundleName"]
-                    # https://storage.sekai.best/sekai-jp-assets/character/member/res019_no034/card_after_training.webp
-                    try:
-                        card_url = "https://storage.sekai.best/sekai-jp-assets/character/member/" + name + "_rip/card_normal.webp"
-                        card_req = requests.get(card_url)
-                        im = Image.open(BytesIO(card_req.content))
-                    except PIL.UnidentifiedImageError:
-                        card_url = "https://storage.sekai.best/sekai-jp-assets/character/member/" + name + "/card_normal.webp"
-                        card_req = requests.get(card_url)
-                        im = Image.open(BytesIO(card_req.content))
-                    im.save("eventcard.png", "png")
-                    await ctx.send(file=discord.File("eventcard.png"))
-                    try:
-                        card_url = "https://storage.sekai.best/sekai-tc-assets/character/member/" + name + "_rip/card_after_training.webp"
-                        card_req = requests.get(card_url)
-                        im = Image.open(BytesIO(card_req.content))
-                    except PIL.UnidentifiedImageError:
-                        card_url = "https://storage.sekai.best/sekai-tc-assets/character/member/" + name + "/card_after_training.webp"
-                        card_req = requests.get(card_url)
-                        im = Image.open(BytesIO(card_req.content))
-                    im.save("eventcard.png", "png")
-                    await ctx.send(file=discord.File("eventcard.png"))
-                card_ids.remove(c["id"])
-    os.remove("eventcard.png")
+        cards_url = "https://sekai-world.github.io/sekai-master-db-tc-diff/cards.json"
+        async with session.get(cards_url) as response:
+                    cards_json = await response.json()
 
+        download_tasks = []
 
-def get_img(url):
-    req = requests.get(url)
-    im = Image.open(BytesIO(req.content))
-    return im
+        for c in cards_json:
+            if card_ids:
+                if c["id"] in card_ids:
+                    if c["cardRarityType"] != "rarity_2":
+                        name = c["assetbundleName"]
+                        normal_url = f"https://storage.sekai.best/sekai-jp-assets/character/member/{name}_rip/card_normal.webp"
+                        download_tasks.append(fetch_image(session, normal_url))
+                        trained_url = f"https://storage.sekai.best/sekai-tc-assets/character/member/{name}_rip/card_after_training.webp"
+                        download_tasks.append(fetch_image(session, trained_url))
+                    card_ids.remove(c["id"])
+        
+        image_data_list = await asyncio.gather(*download_tasks, return_exceptions=True)
+
+        for i in image_data_list:
+            with open("eventcard.png", "wb") as f:
+                f.write(i)
+            await ctx.send(file=discord.File("eventcard.png"))
+
+        os.remove("eventcard.png")
 
 
 @bot.command(name="assets")
 async def assets(ctx, event: str):
     async with ctx.typing():
+        start_time = time.time()
+
+        async def fetch_json(session, url):
+            async with session.get(url) as response:
+                response.raise_for_status()
+                return await response.json()
+
         with ZipFile(event + "_assets.zip", 'w') as zip_file:
-            events_url = 'https://sekai-world.github.io/sekai-master-db-tc-diff/events.json'
-            events = urllib.request.urlopen(events_url)
-            events_json = json.loads(events.read())
-            for e in events_json:
-                if e["id"] == int(event):
-                    assetBundleName = e["assetbundleName"]
-                    break
+            async with aiohttp.ClientSession() as session:
+                # Fetch all JSON data concurrently
+                events_task = fetch_json(session, 'https://sekai-world.github.io/sekai-master-db-tc-diff/events.json')
+                eventcards_task = fetch_json(session, "https://sekai-world.github.io/sekai-master-db-tc-diff/eventCards.json")
+                cards_task = fetch_json(session, "https://sekai-world.github.io/sekai-master-db-tc-diff/cards.json")
+                
+                events_json, eventcards_json, cards_json = await asyncio.gather(
+                    events_task, eventcards_task, cards_task
+                )
 
-            # logo
-            try:
-                logo_url = "https://storage.sekai.best/sekai-tc-assets/event/" + assetBundleName + "/logo_rip/logo.webp"
-                logo_req = requests.get(logo_url)
-                logo_im = Image.open(BytesIO(logo_req.content))
-            except PIL.UnidentifiedImageError:
-                logo_url = "https://storage.sekai.best/sekai-tc-assets/event/" + assetBundleName + "/logo/logo.webp"
-                logo_req = requests.get(logo_url)
-                logo_im = Image.open(BytesIO(logo_req.content))
+                # Get assetBundleName
+                assetBundleName = None
+                for e in events_json:
+                    if e["id"] == int(event):
+                        assetBundleName = e["assetbundleName"]
+                        break
+                
+                if not assetBundleName:
+                    await ctx.send("Event not found")
+                    return
 
-            file_object = io.BytesIO()
-            logo_im.save(file_object, "PNG")
-            logo_im.close()
-            zip_file.writestr("logo.png", file_object.getvalue())
+                download_tasks = []
+                filenames = []
 
-            # cards
-            eventcards_url = "https://sekai-world.github.io/sekai-master-db-tc-diff/eventCards.json"
-            eventcards = urllib.request.urlopen(eventcards_url)
-            eventcards_json = json.loads(eventcards.read())
-            card_ids = []
-            flag = "n"
-            for c in eventcards_json:
-                if c["eventId"] == int(event):
-                    card_ids.append(c["cardId"])
-                    flag = "y"
-                elif flag == "y":
-                    break
+                # Logo
+                logo_url = f"https://storage.sekai.best/sekai-tc-assets/event/{assetBundleName}/logo_rip/logo.webp"
+                download_tasks.append(fetch_image(session, logo_url))
+                filenames.append("logo.webp")
 
-            all_cards = urllib.request.urlopen("https://sekai-world.github.io/sekai-master-db-tc-diff/cards.json")
-            cards_json = json.loads(all_cards.read())
-            for c in cards_json:
-                if card_ids:
-                    if c["id"] in card_ids:
-                        if c["cardRarityType"] != "rarity_2":
-                            name = c["assetbundleName"]
-                            # https://storage.sekai.best/sekai-jp-assets/character/member/res019_no034/card_after_training.webp
-                            try:
-                                card_url = "https://storage.sekai.best/sekai-jp-assets/character/member/" + name + "_rip/card_normal.webp"
-                                card_req = requests.get(card_url)
-                                im = Image.open(BytesIO(card_req.content))
-                            except PIL.UnidentifiedImageError:
-                                card_url = "https://storage.sekai.best/sekai-jp-assets/character/member/" + name + "/card_normal.webp"
-                                card_req = requests.get(card_url)
-                                im = Image.open(BytesIO(card_req.content))
+                # Cards
+                card_ids = []
+                flag = "n"
+                for c in eventcards_json:
+                    if c["eventId"] == int(event):
+                        card_ids.append(c["cardId"])
+                        flag = "y"
+                    elif flag == "y":
+                        break
 
-                            file_object = io.BytesIO()
-                            im.save(file_object, "PNG")
-                            im.close()
-                            zip_file.writestr(f"card{c['id']}.png", file_object.getvalue())
+                for c in cards_json:
+                    if card_ids:
+                        if c["id"] in card_ids:
+                            if c["cardRarityType"] != "rarity_2":
+                                name = c["assetbundleName"]
+                                card_normal_url = f"https://storage.sekai.best/sekai-jp-assets/character/member/{name}_rip/card_normal.webp"
+                                download_tasks.append(fetch_image(session, card_normal_url))
+                                filenames.append(f"card{c['id']}.webp")
 
-                            try:
-                                card_url = "https://storage.sekai.best/sekai-tc-assets/character/member/" + name + "_rip/card_after_training.webp"
-                                card_req = requests.get(card_url)
-                                im = Image.open(BytesIO(card_req.content))
+                                card_trained_url = f"https://storage.sekai.best/sekai-tc-assets/character/member/{name}_rip/card_after_training.webp"
+                                download_tasks.append(fetch_image(session, card_trained_url))
+                                filenames.append(f"card{c['id']}_trained.webp")
 
-                            except PIL.UnidentifiedImageError:
-                                card_url = "https://storage.sekai.best/sekai-tc-assets/character/member/" + name + "/card_after_training.webp"
-                                card_req = requests.get(card_url)
-                                im = Image.open(BytesIO(card_req.content))
+                            card_ids.remove(c["id"])
 
-                            file_object = io.BytesIO()
-                            im.save(file_object, "PNG")
-                            im.close()
-                            zip_file.writestr(f"card{c['id']}_trained.png", file_object.getvalue())
+                # Download all images concurrently
+                image_data_list = await asyncio.gather(*download_tasks, return_exceptions=True)
 
-                        card_ids.remove(c["id"])
+                # Write to zip
+                for filename, image_data in zip(filenames, image_data_list):
+                    if image_data and not isinstance(image_data, Exception):
+                        zip_file.writestr(filename, image_data)
+
         await ctx.send(file=discord.File(event + "_assets.zip"))
+        await ctx.send("Runtime: %s seconds" % (time.time() - start_time))
     os.remove(event + "_assets.zip")
 
 
