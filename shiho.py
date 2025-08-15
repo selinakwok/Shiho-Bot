@@ -1519,11 +1519,16 @@ async def cards(ctx, event):
     os.remove("eventcard.png")
 
 
+def get_img(url):
+    req = requests.get(url)
+    im = Image.open(BytesIO(req.content))
+    return im
+
+
 @bot.command(name="assets")
 async def assets(ctx, event: str):
     async with ctx.typing():
         with ZipFile(event + "_assets.zip", 'w') as zip_file:
-            # logo
             events_url = 'https://sekai-world.github.io/sekai-master-db-tc-diff/events.json'
             events = urllib.request.urlopen(events_url)
             events_json = json.loads(events.read())
@@ -1531,9 +1536,17 @@ async def assets(ctx, event: str):
                 if e["id"] == int(event):
                     assetBundleName = e["assetbundleName"]
                     break
-            logo_url = "https://storage.sekai.best/sekai-tc-assets/event/" + assetBundleName + "/logo_rip/logo.webp"
-            logo_req = requests.get(logo_url)
-            logo_im = Image.open(BytesIO(logo_req.content))
+
+            # logo
+            try:
+                logo_url = "https://storage.sekai.best/sekai-tc-assets/event/" + assetBundleName + "/logo_rip/logo.webp"
+                logo_req = requests.get(logo_url)
+                logo_im = Image.open(BytesIO(logo_req.content))
+            except PIL.UnidentifiedImageError:
+                logo_url = "https://storage.sekai.best/sekai-tc-assets/event/" + assetBundleName + "/logo/logo.webp"
+                logo_req = requests.get(logo_url)
+                logo_im = Image.open(BytesIO(logo_req.content))
+
             file_object = io.BytesIO()
             logo_im.save(file_object, "PNG")
             logo_im.close()
@@ -1559,20 +1572,36 @@ async def assets(ctx, event: str):
                     if c["id"] in card_ids:
                         if c["cardRarityType"] != "rarity_2":
                             name = c["assetbundleName"]
-                            card_url = "https://storage.sekai.best/sekai-tc-assets/character/member/" + name + "_rip/card_normal.webp"
-                            card_req = requests.get(card_url)
-                            im = Image.open(BytesIO(card_req.content))
+                            # https://storage.sekai.best/sekai-jp-assets/character/member/res019_no034/card_after_training.webp
+                            try:
+                                card_url = "https://storage.sekai.best/sekai-jp-assets/character/member/" + name + "_rip/card_normal.webp"
+                                card_req = requests.get(card_url)
+                                im = Image.open(BytesIO(card_req.content))
+                            except PIL.UnidentifiedImageError:
+                                card_url = "https://storage.sekai.best/sekai-jp-assets/character/member/" + name + "/card_normal.webp"
+                                card_req = requests.get(card_url)
+                                im = Image.open(BytesIO(card_req.content))
+
                             file_object = io.BytesIO()
                             im.save(file_object, "PNG")
                             im.close()
                             zip_file.writestr(f"card{c['id']}.png", file_object.getvalue())
-                            card_url = "https://storage.sekai.best/sekai-tc-assets/character/member/" + name + "_rip/card_after_training.webp"
-                            card_req = requests.get(card_url)
-                            im = Image.open(BytesIO(card_req.content))
+
+                            try:
+                                card_url = "https://storage.sekai.best/sekai-tc-assets/character/member/" + name + "_rip/card_after_training.webp"
+                                card_req = requests.get(card_url)
+                                im = Image.open(BytesIO(card_req.content))
+
+                            except PIL.UnidentifiedImageError:
+                                card_url = "https://storage.sekai.best/sekai-tc-assets/character/member/" + name + "/card_after_training.webp"
+                                card_req = requests.get(card_url)
+                                im = Image.open(BytesIO(card_req.content))
+
                             file_object = io.BytesIO()
                             im.save(file_object, "PNG")
                             im.close()
                             zip_file.writestr(f"card{c['id']}_trained.png", file_object.getvalue())
+
                         card_ids.remove(c["id"])
         await ctx.send(file=discord.File(event + "_assets.zip"))
     os.remove(event + "_assets.zip")
