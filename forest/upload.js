@@ -1,12 +1,15 @@
-// Game API capture script for Discord - Fixed version
-const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1420729437019967590/86GRYENP3UJfvaFRQbyjofNr8i9yqxMDZ0bBhYz14IV3eTSIftNvkVw8NI7gs0kLAdbd";
+// Script to upload game api response body in chunks
+// Origin author: NeuraXmy
+// Modified for Discord webhook
+const scriptName = "upload.js";
+const version = "0.2.0";
 
-const scriptName = "pjsk-discord-capture-fixed";
-const version = "1.2.0";
 const upload_id = Math.random().toString(36).substr(2, 9);
+const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1420729437019967590/86GRYENP3UJfvaFRQbyjofNr8i9yqxMDZ0bBhYz14IV3eTSIftNvkVw8NI7gs0kLAdbd";
+const body = $response.body;
 
 function log(message) {
-    console.log(`[${scriptName}] [${upload_id}] ${message}`);
+    console.log(`[${scriptName}-v${version}] [${upload_id}] ${message}`);
 }
 
 function getUserId(url) {
@@ -17,150 +20,52 @@ function getUserId(url) {
     return "unknown";
 }
 
-function getApiType(url) {
-    if (url.includes("/mysekai")) {
-        return "MySekai Data";
-    } else if (url.includes("/suite/user/")) {
-        return "Suite Data";
-    }
-    return "Unknown API";
-}
-
-function sendToDiscord(success, data = null, error = null) {
+function sendToDiscord(success, message, errorDetails = null) {
     const userId = getUserId($request.url);
-    const apiType = getApiType($request.url);
-    const timestamp = new Date().toISOString();
     
-    let embed;
-    let content;
-
+    let content, color;
     if (success) {
-        // Success message
-        let dataPreview = "No data available";
-        let dataSize = 0;
-        
-        if (data) {
-            dataSize = data.length;
-            try {
-                // Handle binary data properly
-                let dataString = "";
-                if (typeof data === 'string') {
-                    dataString = data;
-                } else if (data.constructor === ArrayBuffer || data.constructor === Uint8Array) {
-                    // Convert binary to string for preview
-                    const decoder = new TextDecoder('utf-8');
-                    dataString = decoder.decode(data);
-                } else {
-                    dataString = data.toString();
-                }
-                dataPreview = dataString.substring(0, 2000);
-            } catch (e) {
-                dataPreview = `[Binary data - ${e.message}]`;
-            }
-        }
-
-        embed = {
-            title: "✅ Game API Data Captured",
-            color: 0x00ff00,
-            description: `Successfully captured ${apiType}`,
-            fields: [
-                {
-                    name: "User ID",
-                    value: userId,
-                    inline: true
-                },
-                {
-                    name: "API Type",
-                    value: apiType,
-                    inline: true
-                },
-                {
-                    name: "Data Size",
-                    value: `${dataSize} bytes`,
-                    inline: true
-                },
-                {
-                    name: "Upload ID",
-                    value: upload_id,
-                    inline: true
-                },
-                {
-                    name: "Timestamp",
-                    value: timestamp,
-                    inline: true
-                },
-                {
-                    name: "URL",
-                    value: $request.url.length > 100 ? $request.url.substring(0, 97) + "..." : $request.url,
-                    inline: false
-                },
-                {
-                    name: "Data Preview (First 2000 chars)",
-                    value: dataPreview.length > 0 ? "```json\n" + dataPreview + "\n```" : "No preview available",
-                    inline: false
-                }
-            ]
-        };
-        content = "🎮 **Game API Captured Successfully!**";
-        
+        content = `✅ **API Successfully Intercepted**`;
+        color = 0x00ff00;
     } else {
-        // Error message - same as before
-        let errorDetails = "Unknown error";
-        if (error) {
-            try {
-                if (typeof error === 'string') {
-                    errorDetails = error.substring(0, 3000);
-                } else {
-                    errorDetails = JSON.stringify(error).substring(0, 3000);
-                }
-            } catch (e) {
-                errorDetails = "Error details unavailable";
-            }
-        }
-
-        embed = {
-            title: "❌ Game API Capture Failed",
-            color: 0xff0000,
-            description: `Failed to capture ${apiType}`,
-            fields: [
-                {
-                    name: "User ID",
-                    value: userId,
-                    inline: true
-                },
-                {
-                    name: "API Type",
-                    value: apiType,
-                    inline: true
-                },
-                {
-                    name: "Upload ID",
-                    value: upload_id,
-                    inline: true
-                },
-                {
-                    name: "Timestamp",
-                    value: timestamp,
-                    inline: true
-                },
-                {
-                    name: "URL",
-                    value: $request.url.length > 100 ? $request.url.substring(0, 97) + "..." : $request.url,
-                    inline: false
-                },
-                {
-                    name: "Error Details (First 3000 chars)",
-                    value: "```\n" + errorDetails + "\n```",
-                    inline: false
-                }
-            ]
-        };
-        content = "🚨 **Game API Capture Failed!**";
+        content = `❌ **API Interception Failed**`;
+        color = 0xff0000;
     }
 
     const payload = {
         content: content,
-        embeds: [embed]
+        embeds: [{
+            title: success ? "Game API Captured" : "API Capture Error",
+            color: color,
+            fields: [
+                {
+                    name: "User ID",
+                    value: userId,
+                    inline: true
+                },
+                {
+                    name: "Upload ID", 
+                    value: upload_id,
+                    inline: true
+                },
+                {
+                    name: "Data Size",
+                    value: body ? `${body.length} bytes` : "No data",
+                    inline: true
+                },
+                {
+                    name: "URL",
+                    value: $request.url.length > 100 ? $request.url.substring(0, 97) + "..." : $request.url,
+                    inline: false
+                },
+                {
+                    name: success ? "Status" : "Error Details",
+                    value: errorDetails ? errorDetails.substring(0, 3000) : message,
+                    inline: false
+                }
+            ],
+            timestamp: new Date().toISOString()
+        }]
     };
 
     const options = {
@@ -172,11 +77,9 @@ function sendToDiscord(success, data = null, error = null) {
         body: JSON.stringify(payload)
     };
 
-    log(`Sending ${success ? 'success' : 'failure'} message to Discord`);
-
-    $httpClient.post(options, (httpError, resp, responseData) => {
-        if (httpError || (resp.status !== 200 && resp.status !== 204)) {
-            log(`Discord webhook failed: ${httpError || `HTTP ${resp.status}`}`);
+    $httpClient.post(options, (error, resp, data) => {
+        if (error || (resp.status !== 200 && resp.status !== 204)) {
+            log(`Discord webhook failed: ${error || `HTTP ${resp.status}`}`);
         } else {
             log(`Successfully sent message to Discord`);
         }
@@ -184,29 +87,22 @@ function sendToDiscord(success, data = null, error = null) {
     });
 }
 
-// Main execution
-log("=== GAME API CAPTURE STARTED ===");
+const userId = getUserId($request.url);
+
+log(`开始上传响应内容`);
+log(`内容长度: ${body ? body.length : 0}`);
+log(`原始网址: ${$request.url}`);
+log(`提取到的 User ID: ${userId}`);
 
 try {
-    const requestUrl = $request.url;
-    const responseBody = $response.body;
-    const userId = getUserId(requestUrl);
-    const apiType = getApiType(requestUrl);
-    
-    log(`Processing ${apiType} for user ${userId}`);
-    log(`URL: ${requestUrl}`);
-    log(`Response body length: ${responseBody ? responseBody.length : 'null/undefined'}`);
-    log(`Response body type: ${typeof responseBody}`);
-
-    if (responseBody && responseBody.length > 0) {
-        log("Response body found, sending success message");
-        sendToDiscord(true, responseBody);
+    if (body && body.length > 0) {
+        log("响应内容存在，发送成功消息");
+        sendToDiscord(true, `Successfully captured ${body.length} bytes of API data`);
     } else {
-        log("No response body found, sending error message");
-        sendToDiscord(false, null, "Response body is empty or undefined");
+        log("响应内容为空，发送错误消息");
+        sendToDiscord(false, "Response body is empty", "响应内容为空，无需上传。");
     }
-
 } catch (error) {
-    log(`Script execution error: ${error.message}`);
-    sendToDiscord(false, null, `Script Error: ${error.message}\nStack: ${error.stack || 'N/A'}`);
+    log(`脚本执行错误: ${error.message}`);
+    sendToDiscord(false, "Script execution error", `Script Error: ${error.message}\nStack: ${error.stack || 'N/A'}`);
 }
