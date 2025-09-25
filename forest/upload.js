@@ -1,124 +1,21 @@
-// Script to upload game API response to Discord webhook
-const scriptName = "discord-upload.js";
-const version = "1.0.0";
+// Script to upload game API response to Discord webhook - Debug Version
+const scriptName = "discord-upload-debug.js";
+const version = "1.1.0";
 
-// Replace with your Discord webhook URL
+// Discord webhook URL
 const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1420729437019967590/86GRYENP3UJfvaFRQbyjofNr8i9yqxMDZ0bBhYz14IV3eTSIftNvkVw8NI7gs0kLAdbd";
 
 const upload_id = Math.random().toString(36).substr(2, 9);
-const body = $response.body;
 
 function log(message) {
     console.log(`[${scriptName}-v${version}] [${upload_id}] ${message}`);
 }
 
-function getUserId(url) {
-    const match = url.match(/\/user\/(\d+)|suite\/user\/(\d+)/);
-    if (match) {
-        return match[1] || match[2] || "unknown";
-    }
-    return "unknown";
-}
-
-function sendSuccessToDiscord(data, userId, originalUrl) {
-    // Get first 2000 characters of response for preview
-    let dataPreview = "";
-    try {
-        if (typeof data === 'string') {
-            dataPreview = data.substring(0, 2000);
-        } else if (data && data.length) {
-            // Try to convert to string first
-            dataPreview = data.toString().substring(0, 2000);
-        }
-    } catch (e) {
-        dataPreview = "[Binary data - cannot preview]";
-    }
-
+function sendDebugMessage(status, details) {
     const embed = {
-        title: "✅ Game API Data Captured Successfully",
-        color: 0x00ff00,
-        description: "Successfully intercepted game API response",
+        title: status === "success" ? "✅ Script Executed" : "❌ Script Error",
+        color: status === "success" ? 0x00ff00 : 0xff0000,
         fields: [
-            {
-                name: "User ID",
-                value: userId,
-                inline: true
-            },
-            {
-                name: "Data Size",
-                value: `${data.length} bytes`,
-                inline: true
-            },
-            {
-                name: "Upload ID",
-                value: upload_id,
-                inline: true
-            },
-            {
-                name: "URL",
-                value: originalUrl.length > 100 ? originalUrl.substring(0, 97) + "..." : originalUrl,
-                inline: false
-            },
-            {
-                name: "Data Preview (First 2000 chars)",
-                value: dataPreview.length > 0 ? "```json\n" + dataPreview + "\n```" : "No preview available",
-                inline: false
-            }
-        ],
-        timestamp: new Date().toISOString()
-    };
-
-    const payload = {
-        content: "🎮 **API Capture Success**",
-        embeds: [embed]
-    };
-
-    const options = {
-        method: "POST",
-        url: DISCORD_WEBHOOK_URL,
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-    };
-
-    log(`Sending success message to Discord for user ${userId}`);
-
-    $httpClient.post(options, (error, resp, responseData) => {
-        if (error || (resp.status !== 200 && resp.status !== 204)) {
-            log(`Discord upload failed: ${error || `HTTP ${resp.status}`}`);
-            // Send failure message
-            sendFailureToDiscord(error || `HTTP ${resp.status}`, userId, originalUrl);
-        } else {
-            log(`Successfully sent success message to Discord`);
-        }
-        $done({});
-    });
-}
-
-function sendFailureToDiscord(errorInfo, userId, originalUrl) {
-    // Get first 3000 characters of error for debugging
-    let errorPreview = "";
-    try {
-        if (typeof errorInfo === 'string') {
-            errorPreview = errorInfo.substring(0, 3000);
-        } else if (errorInfo) {
-            errorPreview = JSON.stringify(errorInfo).substring(0, 3000);
-        }
-    } catch (e) {
-        errorPreview = "Error details unavailable";
-    }
-
-    const embed = {
-        title: "❌ Game API Capture Failed",
-        color: 0xff0000,
-        description: "Failed to process game API response",
-        fields: [
-            {
-                name: "User ID",
-                value: userId || "unknown",
-                inline: true
-            },
             {
                 name: "Upload ID",
                 value: upload_id,
@@ -130,21 +27,15 @@ function sendFailureToDiscord(errorInfo, userId, originalUrl) {
                 inline: true
             },
             {
-                name: "URL",
-                value: originalUrl ? (originalUrl.length > 100 ? originalUrl.substring(0, 97) + "..." : originalUrl) : "unknown",
-                inline: false
-            },
-            {
-                name: "Error Details (First 3000 chars)",
-                value: errorPreview.length > 0 ? "```\n" + errorPreview + "\n```" : "No error details available",
+                name: "Details",
+                value: "```\n" + details.substring(0, 1500) + "\n```",
                 inline: false
             }
-        ],
-        timestamp: new Date().toISOString()
+        ]
     };
 
     const payload = {
-        content: "🚨 **API Capture Failed**",
+        content: `🔧 **Debug: ${status.toUpperCase()}**`,
         embeds: [embed]
     };
 
@@ -157,33 +48,78 @@ function sendFailureToDiscord(errorInfo, userId, originalUrl) {
         body: JSON.stringify(payload)
     };
 
-    log(`Sending failure message to Discord`);
-
     $httpClient.post(options, (error, resp, data) => {
-        if (error || (resp.status !== 200 && resp.status !== 204)) {
-            log(`Failed to send failure message to Discord: ${error || `HTTP ${resp.status}`}`);
+        if (error) {
+            log(`Failed to send debug message: ${error}`);
         } else {
-            log(`Successfully sent failure message to Discord`);
+            log(`Debug message sent with status: ${resp.status}`);
         }
-        $done({});
     });
 }
 
-// Main execution
-const userId = getUserId($request.url);
-
-log(`Starting API capture for user ${userId}`);
-log(`Content length: ${body ? body.length : 0}`);
-log(`Original URL: ${$request.url}`);
+// Start execution
+log("=== SCRIPT STARTED ===");
 
 try {
-    if (body && body.length > 0) {
-        sendSuccessToDiscord(body, userId, $request.url);
-    } else {
-        log("Response body is empty");
-        sendFailureToDiscord("Response body is empty or undefined", userId, $request.url);
+    // Check if required objects exist
+    if (typeof $request === 'undefined') {
+        throw new Error("$request is undefined - script may not be running in correct context");
     }
+    
+    if (typeof $response === 'undefined') {
+        throw new Error("$response is undefined - script may not be running in correct context");
+    }
+
+    if (typeof $httpClient === 'undefined') {
+        throw new Error("$httpClient is undefined - script may not be running in correct context");
+    }
+
+    const requestUrl = $request.url;
+    const responseBody = $response.body;
+    
+    log(`Request URL: ${requestUrl}`);
+    log(`Response body length: ${responseBody ? responseBody.length : 'null/undefined'}`);
+    log(`Response body type: ${typeof responseBody}`);
+
+    // Extract user ID
+    function getUserId(url) {
+        const match = url.match(/\/user\/(\d+)|suite\/user\/(\d+)/);
+        if (match) {
+            return match[1] || match[2] || "unknown";
+        }
+        return "unknown";
+    }
+
+    const userId = getUserId(requestUrl);
+    log(`Extracted User ID: ${userId}`);
+
+    // Prepare debug details
+    let debugDetails = `URL: ${requestUrl}\n`;
+    debugDetails += `User ID: ${userId}\n`;
+    debugDetails += `Body length: ${responseBody ? responseBody.length : 'N/A'}\n`;
+    debugDetails += `Body type: ${typeof responseBody}\n`;
+    
+    if (responseBody) {
+        let preview = "";
+        try {
+            if (typeof responseBody === 'string') {
+                preview = responseBody.substring(0, 500);
+            } else {
+                preview = responseBody.toString().substring(0, 500);
+            }
+            debugDetails += `Body preview: ${preview}`;
+        } catch (e) {
+            debugDetails += `Body preview error: ${e.message}`;
+        }
+    }
+
+    sendDebugMessage("success", debugDetails);
+    log("Debug message sent successfully");
+
 } catch (error) {
-    log(`Error during processing: ${error}`);
-    sendFailureToDiscord(error.toString(), userId, $request.url);
+    log(`Script error: ${error.message}`);
+    sendDebugMessage("error", `Script Error: ${error.message}\nStack: ${error.stack || 'N/A'}`);
 }
+
+// Always call $done to complete the script
+$done({});
