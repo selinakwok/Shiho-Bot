@@ -1,8 +1,8 @@
-// Game API capture script for Discord
+// Game API capture script for Discord - Fixed version
 const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1420729437019967590/86GRYENP3UJfvaFRQbyjofNr8i9yqxMDZ0bBhYz14IV3eTSIftNvkVw8NI7gs0kLAdbd";
 
-const scriptName = "pjsk-discord-capture";
-const version = "1.0.0";
+const scriptName = "pjsk-discord-capture-fixed";
+const version = "1.2.0";
 const upload_id = Math.random().toString(36).substr(2, 9);
 
 function log(message) {
@@ -18,7 +18,7 @@ function getUserId(url) {
 }
 
 function getApiType(url) {
-    if (url.includes("/mysekai/")) {
+    if (url.includes("/mysekai")) {
         return "MySekai Data";
     } else if (url.includes("/suite/user/")) {
         return "Suite Data";
@@ -42,13 +42,20 @@ function sendToDiscord(success, data = null, error = null) {
         if (data) {
             dataSize = data.length;
             try {
+                // Handle binary data properly
+                let dataString = "";
                 if (typeof data === 'string') {
-                    dataPreview = data.substring(0, 2000);
+                    dataString = data;
+                } else if (data.constructor === ArrayBuffer || data.constructor === Uint8Array) {
+                    // Convert binary to string for preview
+                    const decoder = new TextDecoder('utf-8');
+                    dataString = decoder.decode(data);
                 } else {
-                    dataPreview = data.toString().substring(0, 2000);
+                    dataString = data.toString();
                 }
+                dataPreview = dataString.substring(0, 2000);
             } catch (e) {
-                dataPreview = "[Binary data - cannot preview]";
+                dataPreview = `[Binary data - ${e.message}]`;
             }
         }
 
@@ -97,7 +104,7 @@ function sendToDiscord(success, data = null, error = null) {
         content = "🎮 **Game API Captured Successfully!**";
         
     } else {
-        // Error message
+        // Error message - same as before
         let errorDetails = "Unknown error";
         if (error) {
             try {
@@ -189,6 +196,7 @@ try {
     log(`Processing ${apiType} for user ${userId}`);
     log(`URL: ${requestUrl}`);
     log(`Response body length: ${responseBody ? responseBody.length : 'null/undefined'}`);
+    log(`Response body type: ${typeof responseBody}`);
 
     if (responseBody && responseBody.length > 0) {
         log("Response body found, sending success message");
