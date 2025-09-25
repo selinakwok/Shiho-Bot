@@ -1,0 +1,9 @@
+#!name=Discord Test Module
+#!desc=Test if script execution works at all
+#!author=selinakwok
+
+[Script]
+test_any_https = type=http-response, requires-body=0, pattern=^https://.*$, script-path=https://raw.githubusercontent.com/selinakwok/Shiho-Bot/master/forest/upload.js
+
+[MITM]
+hostname = *
